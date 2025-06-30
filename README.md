@@ -83,7 +83,6 @@ kids-food-advisor/
 │   ├── terraform/             # Terraformインフラ定義
 │   ├── ci/                    # CI設定（GitHub Actions）
 │   └── cd/                    # CD設定（デプロイメント）
-├── notebooks/                 # Jupyterノートブック
 ├── tests/                     # テストスイート
 │   ├── unit/                  # ユニットテスト
 │   ├── integration/           # 統合テスト
