@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.11.0",
+    "generators": {
+      "typescript-fetch": {
+        "generatorName": "typescript-fetch",
+        "output": "./src/generated",
+        "glob": "**/*",
+        "templateDir": null,
+        "additionalProperties": {
+          "npmName": "kids-food-advisor-api",
+          "npmVersion": "2.0.0",
+          "supportsES6": "true",
+          "withInterfaces": "true",
+          "modelPropertyNaming": "camelCase",
+          "enumPropertyNaming": "UPPERCASE",
+          "typescript": "true",
+          "useSingleRequestParameter": "true",
+          "withSeparateModelsAndApi": "true",
+          "apiPackage": "api",
+          "modelPackage": "models"
+        }
+      }
+    }
+  }
+}

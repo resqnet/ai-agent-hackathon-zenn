@@ -1,0 +1,16 @@
+# .gcloudignore  ---------------------------------
+# まず自分自身と Git メタデータは除外
+.gcloudignore
+.git
+.gitignore
+
+# .gitignore のルールをそのまま取り込む
+#!include:.gitignore
+
+# ----------- ここから例外を「再包含」 -----------
+# src/generated ディレクトリをアップロードしたい
+!src/generated/
+!src/generated/**
+
+# openapi.json をアップロードしたい（ルート直下想定）
+!openapi.json

@@ -1,0 +1,41 @@
+# Cloud Functions用 .gcloudignore
+# デプロイから除外するファイル・ディレクトリ
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 仮想環境
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# テスト
+test_*.py
+*_test.py
+tests/
+
+# ドキュメント
+README.md
+*.md
+
+# ログ
+*.log

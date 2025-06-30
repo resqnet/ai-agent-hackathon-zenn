@@ -1,0 +1,476 @@
+openapi: 3.0.3
+info:
+  title: "Kids Food Advisor Agent Engine Stream API"
+  description: |
+    # Kids Food Advisor Agent Engine Stream API
+
+    ## 概要
+    Vertex AI統合による1歳半〜3歳幼児向け栄養相談システムのREST API（Agent Engine Stream版）
+
+    ## 主な機能
+    - **ストリーミングチャット**: リアルタイムなエージェント対話
+    - **セッション管理**: 会話履歴の作成・取得・削除
+    - **Firebase認証**: 全エンドポイントでFirebase Authentication必須
+
+    ## 技術スタック
+    - **AI Engine**: Google Vertex AI + Gemini 2.0 Flash
+    - **Framework**: Cloud Functions + Google ADK (Agent Development Kit)
+    - **対象年齢**: 1歳半〜3歳の幼児
+  version: "2.0.0"
+  contact:
+    name: "Kids Food Advisor Team"
+servers:
+  - url: "http://localhost:8082"
+    description: "ローカル開発環境"
+  - url: "https://us-central1-my-staging-project-id.cloudfunctions.net/agent_engine_stream"
+    description: "開発環境 Cloud Functions"
+
+components:
+  securitySchemes:
+    FirebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Firebase Authentication IDトークン"
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required:
+        - success
+
+    ChatRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          description: "ユーザーからのメッセージ"
+        sessionId:
+          type: string
+          nullable: true
+          description: "セッションID（省略可能）"
+      required:
+        - message
+
+    VertexAISession:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "セッションの完全なリソース名"
+        createTime:
+          type: string
+          format: date-time
+          description: "作成日時（ISO 8601形式）"
+        updateTime:
+          type: string
+          format: date-time
+          description: "更新日時（ISO 8601形式）"
+        userId:
+          type: string
+          description: "ユーザーID"
+        displayName:
+          type: string
+          nullable: true
+          description: "表示名"
+        sessionState:
+          type: object
+          nullable: true
+          description: "セッション状態"
+      required:
+        - name
+        - createTime
+        - updateTime
+        - userId
+
+    VertexAIPart:
+      type: object
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: "テキスト部分"
+      additionalProperties: true
+
+    VertexAIContent:
+      type: object
+      properties:
+        role:
+          type: string
+          nullable: true
+          enum: [user, model]
+          description: "発言者の役割"
+        parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/VertexAIPart'
+          description: "コンテンツ部分の配列"
+      required:
+        - parts
+
+    VertexAISessionEvent:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "イベントの完全なリソース名"
+        author:
+          type: string
+          description: "発言者"
+        invocationId:
+          type: string
+          description: "呼び出しID"
+        timestamp:
+          type: string
+          format: date-time
+          description: "タイムスタンプ（ISO 8601形式）"
+        content:
+          $ref: '#/components/schemas/VertexAIContent'
+          nullable: true
+          description: "コンテンツ"
+        errorCode:
+          type: string
+          nullable: true
+          description: "エラーコード"
+        errorMessage:
+          type: string
+          nullable: true
+          description: "エラーメッセージ"
+      required:
+        - name
+        - author
+        - invocationId
+        - timestamp
+
+    SessionCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+          nullable: true
+          description: "作成されたセッションID"
+        error:
+          type: string
+          nullable: true
+      required:
+        - success
+
+    SessionGetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        session:
+          $ref: '#/components/schemas/VertexAISession'
+          nullable: true
+        error:
+          type: string
+          nullable: true
+      required:
+        - success
+
+    SessionListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/VertexAISession'
+          nullable: true
+          description: "セッション一覧"
+        nextPageToken:
+          type: string
+          nullable: true
+          description: "次ページのトークン"
+        error:
+          type: string
+          nullable: true
+      required:
+        - success
+
+    SessionEventListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/VertexAISessionEvent'
+          nullable: true
+          description: "セッションイベント一覧"
+        nextPageToken:
+          type: string
+          nullable: true
+          description: "次ページのトークン"
+        error:
+          type: string
+          nullable: true
+      required:
+        - success
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+      required:
+        - loc
+        - msg
+        - type
+
+security:
+  - FirebaseAuth: []
+
+paths:
+  /api/chat/stream:
+    post:
+      summary: "ストリーミングチャット"
+      description: |
+        エージェント毎の発言分割に対応したリアルタイムチャット機能。
+        
+        ## 特徴
+        - Server-Sent Events (SSE) 形式でストリーミング配信
+        - 栄養アドバイザー・くらしアドバイザー毎の発言を分離
+        - リアルタイムな応答表示
+        
+        ## レスポンス形式
+        ```
+        data: {"type": "agent_start", "agent_name": "栄養アドバイザー"}
+        data: {"type": "chunk", "agent_name": "栄養アドバイザー", "content": "朝食の..."}
+        data: {"type": "agent_complete", "agent_name": "栄養アドバイザー", "content": "完全なメッセージ"}
+        data: {"type": "stream_end"}
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: "ストリーミングレスポンス成功"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: "Server-Sent Events形式のストリーミングレスポンス"
+        '400':
+          description: "リクエストエラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/sessions:
+    post:
+      summary: "セッション作成"
+      description: |
+        新しいチャットセッションを作成します。
+        
+        ## 機能
+        - 自動生成されたsessionIdを返却
+        - ADK InMemorySessionService またはVertex AI Sessions API使用
+        - Firebase認証必須
+      responses:
+        '200':
+          description: "セッション作成成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: "サーバーエラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+
+    get:
+      summary: "セッション一覧取得"
+      description: |
+        現在のユーザーのセッション一覧を取得します。
+        
+        ## 機能
+        - userIdでフィルタリング（自動適用）
+        - ページネーション対応（pageToken）
+        - 更新日時順でソート
+      parameters:
+        - name: pageToken
+          in: query
+          required: false
+          description: "ページネーション用のトークン"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "セッション一覧取得成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '500':
+          description: "サーバーエラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+
+  /api/sessions/{sessionId}:
+    get:
+      summary: "セッション詳細取得"
+      description: |
+        指定されたセッションの詳細情報を取得します。
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: "セッションID"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "セッション詳細取得成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionGetResponse'
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: "セッションが見つかりません"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionGetResponse'
+
+    delete:
+      summary: "セッション削除"
+      description: |
+        指定されたセッションを削除します。
+        
+        ## 注意
+        - 物理削除（復元不可）
+        - 関連するイベント履歴も削除されます
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: "削除するセッションID"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "セッション削除成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '204':
+          description: "セッション削除成功（コンテンツなし）"
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: "セッションが見つかりません"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/sessions/{sessionId}/events:
+    get:
+      summary: "セッションイベント履歴取得"
+      description: |
+        指定されたセッションの会話履歴（イベント）を取得します。
+        
+        ## 機能
+        - 会話履歴の詳細（ユーザー・エージェント発言）
+        - ページネーション対応
+        - 時系列順でソート
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: "セッションID"
+          schema:
+            type: string
+        - name: pageToken
+          in: query
+          required: false
+          description: "ページネーション用のトークン"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "セッションイベント取得成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEventListResponse'
+        '401':
+          description: "認証エラー"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: "セッションが見つかりません"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEventListResponse'
