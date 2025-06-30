@@ -116,15 +116,22 @@ git clone https://github.com/resqnet/kids_food_advisor.git
 cd kids_food_advisor
 
 # 2. Python依存関係インストール
+uv venv
+source .venv/bin/activate
 make install
 
 # 3. フロントエンド依存関係インストール
 cd frontend && npm install && cd ..
 ```
 
-#### 2. サービスアカウント設定
+#### 2. Google Cloud設定
 
 ```bash
+# Google Cloudにログイン
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project your-dev-project-id
+
 # Firebase Admin用サービスアカウントキー取得
 gcloud iam service-accounts keys create service-account-key.json \
   --iam-account=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
